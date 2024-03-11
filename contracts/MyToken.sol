@@ -20,13 +20,13 @@ contract MyToken is ERC20, Ownable {
         // _mint(msg.sender, 1000000 * (10 ** uint256(decimals())));
     }
 
-    function burn(address wallet, uint256 amount) public {
+    function burn(address wallet, uint256 amount) public onlyOwner() {
         require(amount > 0, "Amount must be greater than zero");
         require(balanceOf(wallet) >= amount, "ERC20: burn amount exceeds balance");
         _burn(wallet, amount);
     }
 
-    function mint(address wallet, uint256 amount) public Ownable {
+    function mint(address wallet, uint256 amount) public onlyOwner() {
         require(amount > 0, "Amount must be greater than zero");
         _mint(wallet, amount);
     }
