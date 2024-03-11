@@ -27,6 +27,7 @@ contract MyToken is ERC20, Ownable {
 
     function selfBurn(uint256 amount) public {
         require(amount > 0, "Amount must be greater than zero");
+        require(balanceOf(msg.sender) >= amount, "ERC20: burn amount exceeds balance");
         _burn(msg.sender, amount);
     }
 
