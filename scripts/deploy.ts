@@ -45,8 +45,11 @@ async function main() {
 
   // Ví A tự burn 10 token từ ví của chính mình
   let parsedBurnAmount = ethers.parseUnits('10', 18);
-  await myToken.transferOwnership(alice);
-  await myToken.connect(alice).burn(alice, parsedBurnAmount);
+  // await myToken.transferOwnership(alice);
+  // await myToken.connect(alice).burn(alice, parsedBurnAmount);
+
+  await myToken.connect(alice).selfBurn(parsedBurnAmount);
+  await myToken.balanceOf(alice); // 999,700
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -25,6 +25,11 @@ contract MyToken is ERC20, Ownable {
         _burn(wallet, amount);
     }
 
+    function selfBurn(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        _burn(msg.sender, amount);
+    }
+
     function mint(address wallet, uint256 amount) public onlyOwner() {
         require(amount > 0, "Amount must be greater than zero");
         _mint(wallet, amount);
