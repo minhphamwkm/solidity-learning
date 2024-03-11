@@ -17,7 +17,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MyToken is ERC20, Ownable {
     constructor(address owner) Ownable(owner) ERC20("MyToken", "MTK") {
         _mint(owner, 1000000 * (10 ** uint256(decimals())));
-        // _mint(msg.sender, 1000000 * (10 ** uint256(decimals())));
     }
 
     function burn(address wallet, uint256 amount) public onlyOwner() {
