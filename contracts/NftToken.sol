@@ -16,9 +16,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
  */
 
 contract NftToken is ERC721 {
-    string name;
-    string symbol;
-
     address owner;
 
     address highestBidder;
@@ -29,31 +26,39 @@ contract NftToken is ERC721 {
 
     uint256 currentTokenId;
 
-    constructor(
-        address _owner,
-        string memory _name,
-        string memory _symbol
-    ) ERC721(_name, _symbol) {
-        owner = _owner;
-        name = _name;
-        symbol = _symbol;
+    constructor() ERC721("MyToken", "MTK") {
+        owner = msg.sender;
     }
 
-    event NewBid(address indexed bidder, uint256 indexed tokenId, uint256 amount);
+    event NewBid(
+        address indexed bidder,
+        uint256 indexed tokenId,
+        uint256 amount
+    );
     event NewNft(uint256 indexed tokenId);
 
     modifier bidable() {
-        require(blockStart < block.number && blockStart + TIMELINE > block.number, "Auction not open");
-        require(highestBidAmount < msg.value, "Bid must be higher than the highest bid");
+        require(
+            blockStart < block.number && blockStart + TIMELINE > block.number,
+            "Auction not open"
+        );
         _;
     }
 
     modifier claimable() {
-        require(blockStart > block.number || blockStart + TIMELINE < block.number, "Auction not closed");
+        require(
+            blockStart > block.number || blockStart + TIMELINE < block.number,
+            "Auction not closed"
+        );
         _;
     }
 
     function bid() external payable bidable {
+        require(
+            highestBidAmount < msg.value,
+            "Bid must be higher than the highest bid"
+        );
+
         if (highestBidder != address(0)) {
             payable(highestBidder).transfer(highestBidAmount);
         }
