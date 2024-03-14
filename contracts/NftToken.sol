@@ -55,6 +55,14 @@ contract NftToken is ERC721, Ownable {
         _;
     }
 
+    function getHighestBid() external view returns (address, uint256) {
+        return (highestBidder, highestBidAmount);
+    }
+
+    function getCurrentTokenId() external view returns (uint256) {
+        return currentTokenId;
+    }
+
     function bid() external payable bidable {
         require(
             highestBidAmount < msg.value,
