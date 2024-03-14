@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  *
@@ -15,10 +16,10 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
  * Thời hạn bắt đầu tính từ block thứ 0 cho đấu giá là lúc contract được deploy.
  */
 
-contract NftToken is ERC721 {
-    address owner;
+contract NftToken is ERC721, Ownable {
+    address nftOwner;
 
-    address highestBidder;
+    address payable highestBidder;
     uint256 highestBidAmount;
 
     uint256 blockStart;
@@ -26,8 +27,8 @@ contract NftToken is ERC721 {
 
     uint256 currentTokenId;
 
-    constructor() ERC721("MyToken", "MTK") {
-        owner = msg.sender;
+    constructor() Ownable(msg.sender) ERC721("NftToken", "NFT") {
+        nftOwner = msg.sender;
     }
 
     event NewBid(
@@ -70,14 +71,20 @@ contract NftToken is ERC721 {
 
     function claim() external claimable {
         if (highestBidder == address(0)) {
-            _mint(owner, currentTokenId);
+            _mint(nftOwner, currentTokenId);
         } else {
             _mint(highestBidder, currentTokenId);
         }
-        highestBidder = address(0);
+        highestBidder = payable(address(0));
         highestBidAmount = 0;
         currentTokenId += 1;
 
         emit NewNft(currentTokenId);
+    }
+
+    function withdrawn() external onlyOwner claimable {
+        if (highestBidder != address(0)) {
+            payable(nftOwner).transfer(highestBidAmount);
+        }
     }
 }

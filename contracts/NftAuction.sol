@@ -1,67 +1,187 @@
-// // SPDX-License-Identifier: UNLICENSED
-// pragma solidity ^0.8.24;
+// SPDX-License-Identifier: UNLICENSED
 
-// import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-// import "@openzeppelin/contracts/access/Ownable.sol";
-// import "./NftToken.sol";
+pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-// contract NftAuction is ERC721 {
-//     struct AuctionInfo {
-//         address owner;
-//         uint256 highestBid;
-//         address payable highestBidder;
-//         uint256 auctionStartBlock;
-//         uint256 auctionEndBlock;
-//         bool isEnded;
-//         bool isClaimed;
-//     }
+/**
+ * Bài 3:
+    - Viết contract bán NFT theo giá bid:
+        + Sẽ có nhiều người được bán cùng lúc
+        + userA có NFT, muốn bán NFT theo cách đấu giá
+        + userA nạp NFT vào sàn đấu giá
+        + Có thời gian bắt đầu, kết thúc
+        + Sau thời gian kết thúc:
+            - Nếu có người đấu giá, NFT sẽ được chuyển cho người đấu giá có giá cao nhất
+            - Tiền sẽ được chuyển về người bán
+            - Nếu không có người đấu giá, NFT sẽ được trả về cho người bán
+        + Có thể hủy đấu giá trước thời gian kết thúc nếu không có người đấu giá, NFT sẽ đc trả về người bán
+        + Admin có quyền hủy đấu giá bất kì lúc nào, NFT sẽ đc trả về người bán, người đã đấu giá sẽ được nhận lại tiền
+    - Vẽ diagram cho flow của contract
+    - Viết contract theo logic được vẽ từ diagram + unit test
+ */
 
-//     mapping(address => AuctionInfo) auctions;
+contract MyToken is ERC721, Ownable {
+    constructor(address _owner) ERC721("TokenAuction", "TA") Ownable(_owner) {}
 
-//     constructor() ERC721("NftAuction", "NFTA") {}
+    function mint(address to, uint256 tokenId) public onlyOwner {
+        _safeMint(to, tokenId);
+    }
+}
 
-//     modifier duringAuction(address _nftId) {
-//         require(auctions[_nftId].auctionStartBlock < block.number && block.number < auctions[_nftId].auctionEndBlock, "Auction not open");
-//         _;
-//     }
+contract Auction is Ownable {
+    struct AuctionInfo {
+        address owner;
+        uint256 tokenId;
+        address tokenContract;
+        uint256 highestBid;
+        address payable highestBidder;
+        uint256 startTime;
+        uint256 endTime;
+        bool isEnded;
+        bool isClaimed;
+    }
 
-//     modifier notDuringAution(address _nftId) {
-//         require(auctions[_nftId].auctionStartBlock > block.number || block.number > auctions[_nftId].auctionEndBlock, "Auction not closed");
-//         _;
-//     }
+    mapping(uint256 => AuctionInfo) public auctions;
 
-//     modifier isValidNft(address _nftId) {
-//         require(abi.encodePacked(auctions[_nftId]).length > 0, "Not owner");
-//         _;
-//     }
+    event NewBid(
+        address indexed bidder,
+        uint256 indexed tokenId,
+        uint256 amount
+    );
+    event AuctionEnded(
+        uint256 indexed tokenId,
+        address indexed winner,
+        uint256 amount
+    );
+    event Claimed(address indexed bidder, uint256 indexed tokenID);
 
-//     modifier isOwner(address _nftId) {
-//         require(msg.sender == auctions[_nftId].owner, "Not owner");
-//         _;
-//     }
+    modifier auctionExists(uint256 tokenId) {
+        require(
+            auctions[tokenId].owner != address(0),
+            "Auction does not exist"
+        );
+        _;
+    }
 
-//     modifier isClaimed(address _nftId) {
-//         require(auctions[_nftId].isClaimed, "NFT not claimed");
-//         _;
-//     }
+    modifier onlyTokenOwner(uint256 tokenId) {
+        require(auctions[tokenId].owner == msg.sender, "Not the token owner");
+        _;
+    }
 
-//     //
-//     function addNft(address _nftId, address _owner, uint256 _amount) external {
-//         auctions[_nftId] = AuctionInfo(_owner, _amount, payable(address(0)), block.number, block.number + 10, false, false);
-//     }
+    modifier bidable(uint256 tokenId) {
+        require(
+            auctions[tokenId].startTime < block.timestamp &&
+                auctions[tokenId].endTime > block.timestamp,
+            "Auction not open"
+        );
+        _;
+    }
 
-//     function bid(address _nftId, uint _amount) payable external duringAuction(_nftId) {
-//         require(msg.value > _amount, "Insufficient balance");
-//         require(auctions[_nftId].highestBid < _amount, "Bid must be higher than the highest bid");
+    modifier claimable(uint256 tokenId) {
+        require(auctions[tokenId].endTime < block.number, "Auction not closed");
+        require(
+            auctions[tokenId].highestBidder == msg.sender,
+            "Not the token highest bidder"
+        );
+        _;
+    }
 
-//         auctions[_nftId].highestBid = _amount;
-//         auctions[_nftId].highestBidder = payable msg.sender;
-//     }
+    constructor(address owner) Ownable(owner) {}
 
-//     function claim(address _nftId) external notDuringAution(_nftId) {
-//     }
+    function startAuction(
+        address tokenContract,
+        uint256 tokenId,
+        uint256 amount,
+        uint256 startTime,
+        uint256 endTime
+    ) external {
+        MyToken nft = MyToken(tokenContract);
+        require(nft.ownerOf(tokenId) == msg.sender, "Not token owner");
+        require(
+            startTime > block.timestamp,
+            "start time should be > block timestamp"
+        );
+        require(endTime > startTime, "end time should be > start time");
 
-//     function withdraw(address _nftId) external notDuringAution(_nftId) isOwner(_nftId) {
-//     }
-// }
+        nft.transferFrom(msg.sender, address(this), tokenId);
+
+        auctions[tokenId] = AuctionInfo({
+            owner: msg.sender,
+            tokenId: tokenId,
+            tokenContract: tokenContract,
+            highestBid: amount,
+            highestBidder: payable(address(0)),
+            startTime: startTime,
+            endTime: endTime,
+            isEnded: false,
+            isClaimed: false
+        });
+    }
+
+    function bid(
+        uint256 tokenId
+    ) external payable auctionExists(tokenId) bidable(tokenId) {
+        AuctionInfo memory auction = auctions[tokenId];
+
+        require(msg.value > auction.highestBid, "Bid too low");
+
+        if (auction.highestBidder != address(0)) {
+            auction.highestBidder.transfer(auction.highestBid);
+        }
+
+        auction.highestBid = msg.value;
+        auction.highestBidder = payable(msg.sender);
+
+        emit NewBid(msg.sender, tokenId, msg.value);
+    }
+
+    function endAuction(
+        uint256 tokenId
+    ) external auctionExists(tokenId) bidable(tokenId) onlyTokenOwner(tokenId) {
+        AuctionInfo storage auction = auctions[tokenId];
+        MyToken nft = MyToken(auction.tokenContract);
+        if (auction.highestBidder == address(0)) {
+            nft.transferFrom(address(this), msg.sender, tokenId);
+        } else {
+            nft.transferFrom(address(this), auction.highestBidder, tokenId);
+            payable(auction.owner).transfer(auction.highestBid);
+        }
+
+        auction.isEnded = true;
+        auction.isClaimed = true;
+        emit AuctionEnded(tokenId, auction.highestBidder, auction.highestBid);
+    }
+
+    function claimNFT(
+        uint256 tokenId
+    ) external auctionExists(tokenId) claimable(tokenId) {
+        AuctionInfo storage auction = auctions[tokenId];
+        require(auction.highestBidder == msg.sender, "not highest bidder");
+
+        MyToken nft = MyToken(auction.tokenContract);
+
+        if (!auction.isClaimed) {
+            nft.transferFrom(address(this), msg.sender, tokenId);
+            auction.isClaimed = true;
+
+            payable(auction.owner).transfer(auction.highestBid);
+
+            emit Claimed(msg.sender, tokenId);
+        } else {
+            revert("already claimed");
+        }
+    }
+
+    function forceEnded(
+        uint256 tokenId
+    ) public auctionExists(tokenId) onlyOwner {
+        AuctionInfo storage auction = auctions[tokenId];
+        MyToken nft = MyToken(auction.tokenContract);
+        nft.transferFrom(address(this), auction.owner, tokenId);
+        payable(auction.highestBidder).transfer(auction.highestBid);
+        auction.isClaimed = true;
+        auction.isEnded = true;
+    }
+}
