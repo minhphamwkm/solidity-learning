@@ -39,7 +39,6 @@ contract Auction is Ownable {
         address payable highestBidder;
         uint256 startTime;
         uint256 endTime;
-        bool isEnded;
         bool isClaimed;
     }
 
@@ -80,6 +79,7 @@ contract Auction is Ownable {
     }
 
     modifier claimable(uint256 tokenId) {
+        require(!auctions[tokenId].isClaimed, "Auction already claimed");
         require(auctions[tokenId].endTime < block.number, "Auction not closed");
         require(
             auctions[tokenId].highestBidder == msg.sender,
@@ -115,7 +115,6 @@ contract Auction is Ownable {
             highestBidder: payable(address(0)),
             startTime: startTime,
             endTime: endTime,
-            isEnded: false,
             isClaimed: false
         });
     }
@@ -149,7 +148,7 @@ contract Auction is Ownable {
             payable(auction.owner).transfer(auction.highestBid);
         }
 
-        auction.isEnded = true;
+        auction.endTime = block.timestamp;
         auction.isClaimed = true;
         emit AuctionEnded(tokenId, auction.highestBidder, auction.highestBid);
     }
@@ -158,20 +157,14 @@ contract Auction is Ownable {
         uint256 tokenId
     ) external auctionExists(tokenId) claimable(tokenId) {
         AuctionInfo storage auction = auctions[tokenId];
-        require(auction.highestBidder == msg.sender, "not highest bidder");
-
         MyToken nft = MyToken(auction.tokenContract);
 
-        if (!auction.isClaimed) {
-            nft.transferFrom(address(this), msg.sender, tokenId);
-            auction.isClaimed = true;
+        nft.transferFrom(address(this), msg.sender, tokenId);
+        auction.isClaimed = true;
 
-            payable(auction.owner).transfer(auction.highestBid);
+        payable(auction.owner).transfer(auction.highestBid);
 
-            emit Claimed(msg.sender, tokenId);
-        } else {
-            revert("already claimed");
-        }
+        emit Claimed(msg.sender, tokenId);
     }
 
     function forceEnded(
@@ -182,6 +175,6 @@ contract Auction is Ownable {
         nft.transferFrom(address(this), auction.owner, tokenId);
         payable(auction.highestBidder).transfer(auction.highestBid);
         auction.isClaimed = true;
-        auction.isEnded = true;
+        auction.endTime = block.timestamp;
     }
 }
