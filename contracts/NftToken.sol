@@ -27,8 +27,8 @@ contract NftToken is ERC721, Ownable {
 
     uint256 currentTokenId;
 
-    constructor() Ownable(msg.sender) ERC721("NftToken", "NFT") {
-        nftOwner = msg.sender;
+    constructor(address owner) Ownable(owner) ERC721("NftToken", "NFT") {
+        nftOwner = owner;
     }
 
     event NewBid(

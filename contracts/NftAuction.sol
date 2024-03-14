@@ -22,8 +22,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
     - Viết contract theo logic được vẽ từ diagram + unit test
  */
 
-contract MyToken is ERC721, Ownable {
-    constructor(address _owner) ERC721("TokenAuction", "TA") Ownable(_owner) {}
+contract NFT is ERC721, Ownable {
+    constructor(address _owner) ERC721("NFT", "NFT") Ownable(_owner) {}
 
     function mint(address to, uint256 tokenId) public onlyOwner {
         _safeMint(to, tokenId);
@@ -97,7 +97,7 @@ contract Auction is Ownable {
         uint256 startTime,
         uint256 endTime
     ) external {
-        MyToken nft = MyToken(tokenContract);
+        NFT nft = NFT(tokenContract);
         require(nft.ownerOf(tokenId) == msg.sender, "Not token owner");
         require(
             startTime > block.timestamp,
@@ -140,7 +140,7 @@ contract Auction is Ownable {
         uint256 tokenId
     ) external auctionExists(tokenId) bidable(tokenId) onlyTokenOwner(tokenId) {
         AuctionInfo storage auction = auctions[tokenId];
-        MyToken nft = MyToken(auction.tokenContract);
+        NFT nft = NFT(auction.tokenContract);
         if (auction.highestBidder == address(0)) {
             nft.transferFrom(address(this), msg.sender, tokenId);
         } else {
@@ -157,7 +157,7 @@ contract Auction is Ownable {
         uint256 tokenId
     ) external auctionExists(tokenId) claimable(tokenId) {
         AuctionInfo storage auction = auctions[tokenId];
-        MyToken nft = MyToken(auction.tokenContract);
+        NFT nft = NFT(auction.tokenContract);
 
         nft.transferFrom(address(this), msg.sender, tokenId);
         auction.isClaimed = true;
@@ -171,7 +171,7 @@ contract Auction is Ownable {
         uint256 tokenId
     ) public auctionExists(tokenId) onlyOwner {
         AuctionInfo storage auction = auctions[tokenId];
-        MyToken nft = MyToken(auction.tokenContract);
+        NFT nft = NFT(auction.tokenContract);
         nft.transferFrom(address(this), auction.owner, tokenId);
         payable(auction.highestBidder).transfer(auction.highestBid);
         auction.isClaimed = true;
