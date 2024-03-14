@@ -134,6 +134,20 @@ contract Auction is Ownable {
         auctionId += 1;
     }
 
+    function getAuctionInfo(
+        uint256 _auctionId
+    ) external view returns (AuctionInfo memory) {
+        return auctions[_auctionId];
+    }
+
+    function getAllAuctions() external view returns (AuctionInfo[] memory) {
+        AuctionInfo[] memory result = new AuctionInfo[](auctionId - 1);
+        for (uint256 i = 1; i < auctionId; i++) {
+            result[i - 1] = auctions[i];
+        }
+        return result;
+    }
+
     function bid(
         uint256 _auctionId
     ) external payable auctionExists(_auctionId) bidable(_auctionId) {
