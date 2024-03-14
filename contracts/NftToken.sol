@@ -70,7 +70,7 @@ contract NftToken is ERC721, Ownable {
         );
 
         if (highestBidder != address(0)) {
-            payable(highestBidder).transfer(highestBidAmount);
+            highestBidder.transfer(highestBidAmount);
         }
         highestBidder = payable(msg.sender);
         highestBidAmount = msg.value;
@@ -83,15 +83,13 @@ contract NftToken is ERC721, Ownable {
             _mint(nftOwner, currentTokenId);
         } else {
             _mint(highestBidder, currentTokenId);
+            payable(nftOwner).transfer(highestBidAmount);
         }
+
         highestBidder = payable(address(0));
         highestBidAmount = 0;
         currentTokenId += 1;
 
         emit NewNft(currentTokenId);
-    }
-
-    function withdrawn() external onlyOwner {
-        payable(nftOwner).transfer(balanceOf(address(this)));
     }
 }

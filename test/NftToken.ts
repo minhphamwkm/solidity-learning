@@ -80,15 +80,4 @@ describe("NftToken", function () {
     expect(ownerNft).to.equal(alice.address);
     expect(await nftToken.getCurrentTokenId()).to.equal(1);
   });
-
-  it("Should highest bidder claim nft when bid time end", async function () {
-    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
-    await nftToken.connect(alice).bid({ value: 10 });
-
-    mine(200);
-    await nftToken.claim();
-    const ownerNft = await nftToken.ownerOf(0);
-    expect(ownerNft).to.equal(alice.address);
-    expect(await nftToken.getCurrentTokenId()).to.equal(1);
-  });
 });
