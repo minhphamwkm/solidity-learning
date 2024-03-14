@@ -82,9 +82,7 @@ contract NftToken is ERC721, Ownable {
         emit NewNft(currentTokenId);
     }
 
-    function withdrawn() external onlyOwner claimable {
-        if (highestBidder != address(0)) {
-            payable(nftOwner).transfer(highestBidAmount);
-        }
+    function withdrawn() external onlyOwner {
+        payable(nftOwner).transfer(balanceOf(address(this)));
     }
 }
