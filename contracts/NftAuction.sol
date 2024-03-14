@@ -82,8 +82,8 @@ contract Auction is Ownable {
 
     modifier bidable(uint256 _auctionId) {
         require(
-            auctions[_auctionId].startTime < block.timestamp &&
-                auctions[_auctionId].endTime > block.timestamp,
+            auctions[_auctionId].startTime < block.number &&
+                auctions[_auctionId].endTime > block.number,
             "Auction not open"
         );
         _;
@@ -100,8 +100,8 @@ contract Auction is Ownable {
 
     modifier validTimeline(uint256 _startTime, uint256 _endTime) {
         require(
-            _startTime > block.timestamp,
-            "Start time should be > block timestamp"
+            _startTime > block.number,
+            "Start time should be > block number"
         );
         require(_endTime > _startTime, "End time should be > start time");
         _;
@@ -111,7 +111,7 @@ contract Auction is Ownable {
         auctionId = 1;
     }
 
-    function startAuction(
+    function addAuction(
         address _tokenContract,
         uint256 _tokenId,
         uint256 _amount,
@@ -178,7 +178,7 @@ contract Auction is Ownable {
         require(auction.highestBidder == address(0), "Already have bidder");
         nft.transferFrom(address(this), msg.sender, auction.tokenId);
 
-        auction.endTime = block.timestamp;
+        auction.endTime = block.number;
         auction.isClaimed = true;
         emit AuctionEnded(
             _auctionId,
@@ -216,6 +216,6 @@ contract Auction is Ownable {
             payable(auction.highestBidder).transfer(auction.highestBid);
         }
         auction.isClaimed = true;
-        auction.endTime = block.timestamp;
+        auction.endTime = block.number;
     }
 }
