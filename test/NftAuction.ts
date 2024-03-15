@@ -6,6 +6,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 describe("Auction", function () {
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
   async function deploy() {
     const [owner, alice, bob, charlie, david, evan, ..._] =
       await ethers.getSigners();
@@ -27,12 +29,12 @@ describe("Auction", function () {
       await loadFixture(deploy);
 
     await nftToken.connect(alice).approve(auction.getAddress(), 1);
-    const aliceAddAuctionTx = await auction
+    const aliceAddAuctionTx = auction
       .connect(alice)
       .addAuction(nftToken, 1, 100, 100, 500);
 
-    expect(aliceAddAuctionTx).to.changeTokenBalance(nftToken, alice, -1);
-    expect(aliceAddAuctionTx)
+    await expect(aliceAddAuctionTx).to.changeTokenBalance(nftToken, alice, -1);
+    await expect(aliceAddAuctionTx)
       .to.emit(auction, "NewAuction")
       .withArgs(alice.address, 1, 1, nftToken.getAddress(), 100, 500);
 
@@ -46,12 +48,12 @@ describe("Auction", function () {
     expect(aliceAuction.endTime).to.equal(500);
 
     await nftToken.connect(bob).approve(auction, 2);
-    const bobAddAuctionTx = await auction
+    const bobAddAuctionTx = auction
       .connect(bob)
       .addAuction(nftToken, 2, 100, 400, 1000);
 
-    expect(bobAddAuctionTx).to.changeTokenBalance(nftToken, bob, -1);
-    expect(bobAddAuctionTx)
+    await expect(bobAddAuctionTx).to.changeTokenBalance(nftToken, bob, -1);
+    await expect(bobAddAuctionTx)
       .to.emit(auction, "NewAuction")
       .withArgs(bob.address, 2, 2, nftToken.getAddress(), 400, 1000);
 
@@ -72,11 +74,11 @@ describe("Auction", function () {
     await auction.connect(alice).addAuction(nftToken, 1, 100, 100, 500);
     mine(200);
 
-    const charlieBidTx = await auction.connect(charlie).bid(1, { value: 200 });
-    expect(charlieBidTx).to.changeEtherBalance(charlie, -200);
-    expect(charlieBidTx)
+    const charlieBidTx = auction.connect(charlie).bid(1, { value: 200 });
+    await expect(charlieBidTx).to.changeEtherBalance(charlie, -200);
+    await expect(charlieBidTx)
       .to.emit(auction, "NewBid")
-      .withArgs(1, 200, charlie.address);
+      .withArgs(charlie.address, 1, 200);
 
     const aliceAuction = await auction.getAuctionInfo(1);
 
@@ -84,7 +86,7 @@ describe("Auction", function () {
     expect(aliceAuction.highestBidder).to.equal(charlie.address);
   });
 
-  it.only("Should david bid alice auction successful when bid more than charlie bid before", async function () {
+  it("Should david bid alice auction successful when bid more than charlie bid before", async function () {
     const { nftToken, auction, owner, alice, bob, charlie, david, evan } =
       await loadFixture(deploy);
 
@@ -93,15 +95,14 @@ describe("Auction", function () {
     mine(200);
 
     await auction.connect(charlie).bid(1, { value: 200 });
-    const davidBidHigherTx = await auction
-      .connect(david)
-      .bid(1, { value: 300 });
+    const davidBidHigherTx = auction.connect(david).bid(1, { value: 300 });
 
-    expect(davidBidHigherTx).to.changeEtherBalance(charlie, 200);
-    expect(davidBidHigherTx).to.changeEtherBalance(david, -300);
-    expect(davidBidHigherTx)
+    await expect(davidBidHigherTx).to.changeEtherBalance(charlie, 200);
+    await expect(davidBidHigherTx).to.changeEtherBalance(david, -300);
+
+    await expect(davidBidHigherTx)
       .to.emit(auction, "NewBid")
-      .withArgs(1, 300, david.address);
+      .withArgs(david.address, 1, 300);
 
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.highestBid).to.equal(300);
@@ -148,11 +149,11 @@ describe("Auction", function () {
     await auction.connect(alice).addAuction(nftToken, 1, 100, 100, 500);
     mine(200);
 
-    const aliceEndAuctionTx = await auction.connect(alice).endAuction(1);
-    expect(aliceEndAuctionTx).to.changeTokenBalance(nftToken, alice, 1);
-    expect(aliceEndAuctionTx)
+    const aliceEndAuctionTx = auction.connect(alice).endAuction(1);
+    await expect(aliceEndAuctionTx).to.changeTokenBalance(nftToken, alice, 1);
+    await expect(aliceEndAuctionTx)
       .to.emit(auction, "AuctionEnded")
-      .withArgs(1, 0, 0);
+      .withArgs(1, ZERO_ADDRESS, 100);
     expect(await nftToken.ownerOf(1)).to.equal(alice.address);
 
     const aliceAuction = await auction.getAuctionInfo(1);
@@ -185,12 +186,16 @@ describe("Auction", function () {
 
     mine(500);
 
-    const charlieClaimTokenTx = await auction.connect(charlie).claimNFT(1);
-    expect(charlieClaimTokenTx).to.changeTokenBalance(nftToken, charlie, 1);
-    expect(charlieClaimTokenTx)
-      .to.emit(auction, "AuctionClaimed")
+    const charlieClaimTokenTx = auction.connect(charlie).claimNFT(1);
+    await expect(charlieClaimTokenTx).to.changeTokenBalance(
+      nftToken,
+      charlie,
+      1
+    );
+    await expect(charlieClaimTokenTx)
+      .to.emit(auction, "Claimed")
       .withArgs(charlie.address, 1);
-    expect(charlieClaimTokenTx).to.changeEtherBalance(alice, 200);
+    await expect(charlieClaimTokenTx).to.changeEtherBalance(alice, 200);
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.isClaimed).to.equal(true);
     expect(await nftToken.ownerOf(aliceAuction[1])).to.equal(charlie.address);
@@ -221,11 +226,13 @@ describe("Auction", function () {
     mine(200);
 
     await auction.connect(charlie).bid(1, { value: 200 });
-    const adminForceEndTx = await auction.connect(owner).forceEnded(1);
+    const adminForceEndTx = auction.connect(owner).forceEnded(1);
 
-    expect(adminForceEndTx).to.changeTokenBalance(nftToken, alice, 1);
-    expect(adminForceEndTx).to.changeEtherBalance(charlie, 200);
-    expect(adminForceEndTx).to.emit(auction, "AuctionEnded").withArgs(1, 0, 0);
+    await expect(adminForceEndTx).to.changeTokenBalance(nftToken, alice, 1);
+    await expect(adminForceEndTx).to.changeEtherBalance(charlie, 200);
+    await expect(adminForceEndTx)
+      .to.emit(auction, "AuctionEnded")
+      .withArgs(1, ZERO_ADDRESS, 0);
 
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.isClaimed).to.equal(true);
