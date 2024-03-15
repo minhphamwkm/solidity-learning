@@ -27,7 +27,14 @@ describe("Auction", function () {
       await loadFixture(deploy);
 
     await nftToken.connect(alice).approve(auction.getAddress(), 1);
-    await auction.connect(alice).addAuction(nftToken, 1, 100, 100, 500);
+    const aliceAddAuctionTx = await auction
+      .connect(alice)
+      .addAuction(nftToken, 1, 100, 100, 500);
+
+    expect(aliceAddAuctionTx).to.changeTokenBalance(nftToken, alice, -1);
+    expect(aliceAddAuctionTx)
+      .to.emit(auction, "NewAuction")
+      .withArgs(alice.address, 1, 1, nftToken.getAddress(), 100, 500);
 
     // auction id start at 1
     const aliceAuction = await auction.getAuctionInfo(1);
@@ -39,7 +46,14 @@ describe("Auction", function () {
     expect(aliceAuction.endTime).to.equal(500);
 
     await nftToken.connect(bob).approve(auction, 2);
-    await auction.connect(bob).addAuction(nftToken, 2, 100, 400, 1000);
+    const bobAddAuctionTx = await auction
+      .connect(bob)
+      .addAuction(nftToken, 2, 100, 400, 1000);
+
+    expect(bobAddAuctionTx).to.changeTokenBalance(nftToken, bob, -1);
+    expect(bobAddAuctionTx)
+      .to.emit(auction, "NewAuction")
+      .withArgs(bob.address, 2, 2, nftToken.getAddress(), 400, 1000);
 
     const bobAuction = await auction.getAuctionInfo(2);
 
@@ -58,7 +72,11 @@ describe("Auction", function () {
     await auction.connect(alice).addAuction(nftToken, 1, 100, 100, 500);
     mine(200);
 
-    await auction.connect(charlie).bid(1, { value: 200 });
+    const charlieBidTx = await auction.connect(charlie).bid(1, { value: 200 });
+    expect(charlieBidTx).to.changeEtherBalance(charlie, -200);
+    expect(charlieBidTx)
+      .to.emit(auction, "NewBid")
+      .withArgs(1, 200, charlie.address);
 
     const aliceAuction = await auction.getAuctionInfo(1);
 
@@ -66,7 +84,7 @@ describe("Auction", function () {
     expect(aliceAuction.highestBidder).to.equal(charlie.address);
   });
 
-  it("Should david bid alice auction successful when bid more than charlie bid before", async function () {
+  it.only("Should david bid alice auction successful when bid more than charlie bid before", async function () {
     const { nftToken, auction, owner, alice, bob, charlie, david, evan } =
       await loadFixture(deploy);
 
@@ -75,7 +93,15 @@ describe("Auction", function () {
     mine(200);
 
     await auction.connect(charlie).bid(1, { value: 200 });
-    await auction.connect(david).bid(1, { value: 300 });
+    const davidBidHigherTx = await auction
+      .connect(david)
+      .bid(1, { value: 300 });
+
+    expect(davidBidHigherTx).to.changeEtherBalance(charlie, 200);
+    expect(davidBidHigherTx).to.changeEtherBalance(david, -300);
+    expect(davidBidHigherTx)
+      .to.emit(auction, "NewBid")
+      .withArgs(1, 300, david.address);
 
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.highestBid).to.equal(300);
@@ -122,7 +148,11 @@ describe("Auction", function () {
     await auction.connect(alice).addAuction(nftToken, 1, 100, 100, 500);
     mine(200);
 
-    await auction.connect(alice).endAuction(1);
+    const aliceEndAuctionTx = await auction.connect(alice).endAuction(1);
+    expect(aliceEndAuctionTx).to.changeTokenBalance(nftToken, alice, 1);
+    expect(aliceEndAuctionTx)
+      .to.emit(auction, "AuctionEnded")
+      .withArgs(1, 0, 0);
     expect(await nftToken.ownerOf(1)).to.equal(alice.address);
 
     const aliceAuction = await auction.getAuctionInfo(1);
@@ -154,7 +184,13 @@ describe("Auction", function () {
     await auction.connect(charlie).bid(1, { value: 200 });
 
     mine(500);
-    await auction.connect(charlie).claimNFT(1);
+
+    const charlieClaimTokenTx = await auction.connect(charlie).claimNFT(1);
+    expect(charlieClaimTokenTx).to.changeTokenBalance(nftToken, charlie, 1);
+    expect(charlieClaimTokenTx)
+      .to.emit(auction, "AuctionClaimed")
+      .withArgs(charlie.address, 1);
+    expect(charlieClaimTokenTx).to.changeEtherBalance(alice, 200);
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.isClaimed).to.equal(true);
     expect(await nftToken.ownerOf(aliceAuction[1])).to.equal(charlie.address);
@@ -185,14 +221,18 @@ describe("Auction", function () {
     mine(200);
 
     await auction.connect(charlie).bid(1, { value: 200 });
-    await auction.connect(owner).forceEnded(1);
+    const adminForceEndTx = await auction.connect(owner).forceEnded(1);
+
+    expect(adminForceEndTx).to.changeTokenBalance(nftToken, alice, 1);
+    expect(adminForceEndTx).to.changeEtherBalance(charlie, 200);
+    expect(adminForceEndTx).to.emit(auction, "AuctionEnded").withArgs(1, 0, 0);
 
     const aliceAuction = await auction.getAuctionInfo(1);
     expect(aliceAuction.isClaimed).to.equal(true);
     expect(await nftToken.ownerOf(1)).to.equal(alice.address);
   });
 
-  it("Should force end auction by admin during bid time fail cause auction closed", async function () {
+  it("Should force end auction by admin during bid time fail cause auction already claimed", async function () {
     const { nftToken, auction, owner, alice, bob, charlie, david, evan } =
       await loadFixture(deploy);
 
@@ -202,9 +242,10 @@ describe("Auction", function () {
 
     await auction.connect(charlie).bid(1, { value: 200 });
     mine(500);
+    await auction.connect(charlie).claimNFT(1);
 
     await expect(auction.connect(owner).forceEnded(1)).to.be.revertedWith(
-      "Auction closed"
+      "Auction already claimed"
     );
   });
 });

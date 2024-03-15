@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-// import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -34,8 +34,6 @@ contract NFT is ERC721, Ownable {
 interface INFT {
     function ownerOf(uint256 tokenId) external view returns (address);
 
-    function transferFrom(address from, address to, uint256 tokenId) external;
-
     function safeTransferFrom(
         address from,
         address to,
@@ -43,7 +41,7 @@ interface INFT {
     ) external;
 }
 
-contract Auction is Ownable {
+contract Auction is Ownable, IERC721Receiver {
     struct AuctionInfo {
         address owner;
         uint256 tokenId;
@@ -58,6 +56,15 @@ contract Auction is Ownable {
     uint256 auctionId;
 
     mapping(uint256 => AuctionInfo) public auctions;
+
+    event NewAuction(
+        address indexed owner,
+        uint256 indexed auctionId,
+        uint256 tokenId,
+        address tokenContract,
+        uint256 startTime,
+        uint256 endTime
+    );
 
     event NewBid(
         address indexed bidder,
@@ -118,17 +125,17 @@ contract Auction is Ownable {
         auctionId = 1;
     }
 
-    // function onERC721Received(
-    //     address operator,
-    //     address from,
-    //     uint256 tokenId,
-    //     bytes calldata data
-    // ) external pure override returns (bytes4) {
-    //     return
-    //         bytes4(
-    //             keccak256("onERC721Received(address,address,uint256,bytes)")
-    //         );
-    // }
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return
+            bytes4(
+                keccak256("onERC721Received(address,address,uint256,bytes)")
+            );
+    }
 
     function addAuction(
         address _tokenContract,
@@ -139,7 +146,7 @@ contract Auction is Ownable {
     ) external validTimeline(_startTime, _endTime) {
         INFT nft = INFT(_tokenContract);
         require(nft.ownerOf(_tokenId) == msg.sender, "Not token owner");
-        nft.transferFrom(msg.sender, address(this), _tokenId);
+        nft.safeTransferFrom(msg.sender, address(this), _tokenId);
         auctions[auctionId] = AuctionInfo({
             owner: msg.sender,
             tokenId: _tokenId,
@@ -150,6 +157,14 @@ contract Auction is Ownable {
             endTime: _endTime,
             isClaimed: false
         });
+        emit NewAuction(
+            msg.sender,
+            auctionId,
+            _tokenId,
+            _tokenContract,
+            _startTime,
+            _endTime
+        );
         auctionId += 1;
     }
 
@@ -195,7 +210,7 @@ contract Auction is Ownable {
         AuctionInfo storage auction = auctions[_auctionId];
         INFT nft = INFT(auction.tokenContract);
         require(auction.highestBidder == address(0), "Already have bidder");
-        nft.transferFrom(address(this), msg.sender, auction.tokenId);
+        nft.safeTransferFrom(address(this), msg.sender, auction.tokenId);
 
         auction.endTime = block.number;
         auction.isClaimed = true;
@@ -212,7 +227,11 @@ contract Auction is Ownable {
         AuctionInfo storage auction = auctions[_auctionId];
         INFT nft = INFT(auction.tokenContract);
 
-        nft.transferFrom(address(this), auction.highestBidder, auction.tokenId);
+        nft.safeTransferFrom(
+            address(this),
+            auction.highestBidder,
+            auction.tokenId
+        );
         payable(auction.owner).transfer(auction.highestBid);
 
         auction.isClaimed = true;
@@ -225,16 +244,24 @@ contract Auction is Ownable {
     ) public auctionExists(_auctionId) onlyOwner {
         AuctionInfo storage auction = auctions[_auctionId];
 
-        require(auction.endTime > block.number, "Auction closed");
+        require(auction.isClaimed == false, "Auction already claimed");
 
         NFT nft = NFT(auction.tokenContract);
 
-        nft.transferFrom(address(this), auction.owner, auction.tokenId);
+        nft.safeTransferFrom(address(this), auction.owner, auction.tokenId);
 
         if (auction.highestBidder != address(0)) {
             payable(auction.highestBidder).transfer(auction.highestBid);
         }
         auction.isClaimed = true;
         auction.endTime = block.number;
+        auction.highestBid = 0;
+        auction.highestBidder = payable(address(0));
+
+        emit AuctionEnded(
+            _auctionId,
+            auction.highestBidder,
+            auction.highestBid
+        );
     }
 }
