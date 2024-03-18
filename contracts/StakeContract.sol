@@ -105,6 +105,9 @@ contract StakeContract is Ownable, ERC20 {
         );
 
         uint256 total = calculateUnstakeTotal(_index);
+
+        require(balance >= total, "Insufficient balance, contact admin to unstake");
+
         payable(msg.sender).transfer(total);
 
         stakes[msg.sender][_index].isUnstaked = true;
