@@ -17,6 +17,10 @@ async function main() {
 
   const Auction = await ethers.getContractFactory("Auction");
   await Auction.deploy(owner);
+
+  // ----- ex 4 ------
+  const Staking = await ethers.getContractFactory("StakeContract");
+  await Staking.deploy();
 }
 
 // We recommend this pattern to be able to use async/await everywhere
