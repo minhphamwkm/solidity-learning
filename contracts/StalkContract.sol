@@ -66,6 +66,18 @@ contract StakeContract is Ownable, ERC20 {
         durationToAPR[90] = 30;
     }
 
+    function getAllStakes(address _user) external view returns (Stake[] memory) {
+        return stakes[_user];
+    }
+
+    function getStake(address _user, uint256 _index)
+        external
+        view
+        returns (Stake memory)
+    {
+        return stakes[_user][_index];
+    }
+
     function deposit() public payable onlyOwner {
         balance += msg.value;
     }
