@@ -8,13 +8,11 @@ async function main() {
   await MyToken.deploy(owner);
 
   // ----- ex 2 ------
-
   const NftToken = await ethers.getContractFactory("NftToken");
-  await NftToken.deploy();
+  await NftToken.deploy(owner);
 
   // ----- ex 3 ------
-
-  const Nft = await ethers.getContractFactory("Auction");
+  const Nft = await ethers.getContractFactory("NFT");
   await Nft.deploy(owner);
 
   const Auction = await ethers.getContractFactory("Auction");

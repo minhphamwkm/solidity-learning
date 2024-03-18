@@ -17,7 +17,7 @@ devDependencies:
     specifier: ^3.0.0
     version: 3.0.5(ethers@6.11.1)(hardhat@2.21.0)
   '@nomicfoundation/hardhat-network-helpers':
-    specifier: ^1.0.0
+    specifier: ^1.0.10
     version: 1.0.10(hardhat@2.21.0)
   '@nomicfoundation/hardhat-toolbox':
     specifier: ^4.0.0

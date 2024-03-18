@@ -27,8 +27,9 @@ contract NftToken is ERC721, Ownable {
 
     uint256 currentTokenId;
 
-    constructor() Ownable(msg.sender) ERC721("NftToken", "NFT") {
-        nftOwner = msg.sender;
+    constructor(address owner) Ownable(owner) ERC721("NftToken", "NFT") {
+        nftOwner = owner;
+        blockStart = block.number;
     }
 
     event NewBid(
@@ -54,6 +55,14 @@ contract NftToken is ERC721, Ownable {
         _;
     }
 
+    function getHighestBid() external view returns (address, uint256) {
+        return (highestBidder, highestBidAmount);
+    }
+
+    function getCurrentTokenId() external view returns (uint256) {
+        return currentTokenId;
+    }
+
     function bid() external payable bidable {
         require(
             highestBidAmount < msg.value,
@@ -61,7 +70,7 @@ contract NftToken is ERC721, Ownable {
         );
 
         if (highestBidder != address(0)) {
-            payable(highestBidder).transfer(highestBidAmount);
+            highestBidder.transfer(highestBidAmount);
         }
         highestBidder = payable(msg.sender);
         highestBidAmount = msg.value;
@@ -74,15 +83,13 @@ contract NftToken is ERC721, Ownable {
             _mint(nftOwner, currentTokenId);
         } else {
             _mint(highestBidder, currentTokenId);
+            payable(nftOwner).transfer(highestBidAmount);
         }
+
         highestBidder = payable(address(0));
         highestBidAmount = 0;
         currentTokenId += 1;
 
         emit NewNft(currentTokenId);
-    }
-
-    function withdrawn() external onlyOwner {
-        payable(nftOwner).transfer(balanceOf(address(this)));
     }
 }

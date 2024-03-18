@@ -1,117 +1,83 @@
-// import {
-//   time,
-//   loadFixture,
-// } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-// import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-// import { expect } from "chai";
-// import { ethers } from "hardhat";
+import {
+  loadFixture,
+  mine,
+} from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { expect } from "chai";
+import { ethers } from "hardhat";
 
-// describe("NftToken", function () {
-//   async function deploy() {
-//     const [owner, ...addresses]  = await ethers.getSigners();
+describe("NftToken", function () {
+  async function deploy() {
+    const [owner, alice, bob, ..._] = await ethers.getSigners();
 
-//     const NftToken = await ethers.getContractFactory("NftToken");
-//     const nftToken = await NftToken.deploy();
+    const NftToken = await ethers.getContractFactory("NftToken");
+    const nftToken = await NftToken.deploy(owner);
 
-//     return { nftToken, owner, addresses };
-//   }
+    return { nftToken, owner, alice, bob };
+  }
 
-//   describe("Deployment", function () {
-//     it("Should set the right unlockTime", async function () {
-//       const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
+  it("Should bid successful when biddable", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
 
-//       expect(await lock.unlockTime()).to.equal(unlockTime);
-//     });
+    await nftToken.connect(alice).bid({ value: 100 });
 
-//     it("Should set the right owner", async function () {
-//       const { lock, owner } = await loadFixture(deployOneYearLockFixture);
+    const [highestBidder, highestBid] = await nftToken.getHighestBid();
 
-//       expect(await lock.owner()).to.equal(owner.address);
-//     });
+    expect(highestBid).to.equal(100);
+    expect(highestBidder).to.equal(alice.address);
+  });
 
-//     it("Should receive and store the funds to lock", async function () {
-//       const { lock, lockedAmount } = await loadFixture(
-//         deployOneYearLockFixture
-//       );
+  it("Should raise error if bid when cannot biddable", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    await nftToken.connect(alice).bid({ value: 10 });
+    await nftToken.connect(bob).bid({ value: 30 });
 
-//       expect(await ethers.provider.getBalance(lock.target)).to.equal(
-//         lockedAmount
-//       );
-//     });
+    mine(200);
+    await expect(
+      nftToken.connect(alice).bid({ value: 100 })
+    ).to.be.revertedWith("Auction not open");
+  });
 
-//     it("Should fail if the unlockTime is not in the future", async function () {
-//       // We don't use the fixture here because we want a different deployment
-//       const latestTime = await time.latest();
-//       const Lock = await ethers.getContractFactory("Lock");
-//       await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-//         "Unlock time should be in the future"
-//       );
-//     });
-//   });
+  it("Should update highest bidder is bob when alice bid 10 then bob bid 30", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    await nftToken.connect(alice).bid({ value: 10 });
+    await nftToken.connect(bob).bid({ value: 30 });
 
-//   describe("Withdrawals", function () {
-//     describe("Validations", function () {
-//       it("Should revert with the right error if called too soon", async function () {
-//         const { lock } = await loadFixture(deployOneYearLockFixture);
+    const [highestBidder, highestBid] = await nftToken.getHighestBid();
 
-//         await expect(lock.withdraw()).to.be.revertedWith(
-//           "You can't withdraw yet"
-//         );
-//       });
+    expect(highestBid).to.equal(30);
+    expect(highestBidder).to.equal(bob.address);
+  });
 
-//       it("Should revert with the right error if called from another account", async function () {
-//         const { lock, unlockTime, otherAccount } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
+  it("Should raise error when bob bid lower than highest bid", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    await nftToken.connect(alice).bid({ value: 30 });
+    await expect(nftToken.connect(bob).bid({ value: 10 })).to.be.revertedWith(
+      "Bid must be higher than the highest bid"
+    );
+  });
 
-//         // We can increase the time in Hardhat Network
-//         await time.increaseTo(unlockTime);
+  it("Should raise error when claim in bid time", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    await expect(nftToken.claim()).to.be.revertedWith("Auction not closed");
+  });
 
-//         // We use lock.connect() to send a transaction from another account
-//         await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-//           "You aren't the owner"
-//         );
-//       });
+  it("Should owner claim nft when no one bid and generate new nft", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    mine(200);
+    await nftToken.claim();
+    const ownerNft = await nftToken.ownerOf(0);
+    expect(ownerNft).to.equal(owner.address);
+    expect(await nftToken.getCurrentTokenId()).to.equal(1);
+  });
 
-//       it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-//         const { lock, unlockTime } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
+  it("Should highest bidder claim nft when bid time end", async function () {
+    const { nftToken, owner, alice, bob } = await loadFixture(deploy);
+    await nftToken.connect(alice).bid({ value: 10 });
 
-//         // Transactions are sent using the first signer by default
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw()).not.to.be.reverted;
-//       });
-//     });
-
-//     describe("Events", function () {
-//       it("Should emit an event on withdrawals", async function () {
-//         const { lock, unlockTime, lockedAmount } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw())
-//           .to.emit(lock, "Withdrawal")
-//           .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-//       });
-//     });
-
-//     describe("Transfers", function () {
-//       it("Should transfer the funds to the owner", async function () {
-//         const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-//           deployOneYearLockFixture
-//         );
-
-//         await time.increaseTo(unlockTime);
-
-//         await expect(lock.withdraw()).to.changeEtherBalances(
-//           [owner, lock],
-//           [lockedAmount, -lockedAmount]
-//         );
-//       });
-//     });
-//   });
-// });
+    mine(200);
+    await nftToken.claim();
+    const ownerNft = await nftToken.ownerOf(0);
+    expect(ownerNft).to.equal(alice.address);
+    expect(await nftToken.getCurrentTokenId()).to.equal(1);
+  });
+});
