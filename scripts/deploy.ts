@@ -20,7 +20,6 @@ async function main() {
 
   // ----- ex 4 ------
   const Staking = await ethers.getContractFactory("StakeContract");
-  await Staking.deploy();
 }
 
 // We recommend this pattern to be able to use async/await everywhere

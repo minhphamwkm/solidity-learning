@@ -48,7 +48,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-abstract contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradeable, OwnableUpgradeable {
+contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradeable, OwnableUpgradeable {
     uint256 balance;
 
     struct Stake {
@@ -60,7 +60,6 @@ abstract contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradea
     }
 
     mapping(address => Stake[]) public stakes;
-
     mapping(uint8 => uint256) public durationToAPR;
 
     event NewStake(address user, uint256 amount, uint8 duration, uint256 startTime, uint256 stakeIndex);
@@ -80,6 +79,9 @@ abstract contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradea
         durationToAPR[60] = 20;
         durationToAPR[90] = 30;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
 
     function getAllStakes(address _user) external view returns (Stake[] memory) {
         return stakes[_user];
@@ -155,5 +157,117 @@ abstract contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradea
     }
 }
 
-contract StakeContractV2 {
-}
+// contract StakeContractV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable{
+//     uint256 balance;
+
+//     struct Stake {
+//         uint256 amount;
+//         uint8 duration;
+//         uint256 startTime;
+//         uint256 rewardClaimedBySecond;
+//         bool isUnstaked;
+//     }
+
+//     uint256 public rewardBalance;
+
+//     mapping(address => Stake[]) public stakes;
+//     mapping(uint8 => uint256) public durationToAPR;
+
+//     event NewStake(address user, uint256 amount, uint8 duration, uint256 startTime, uint256 stakeIndex);
+//     event Unstake(address user, uint256 total, uint256 unstakeTime);
+//     event ClaimReward(address user, uint256 reward, uint256 claimTime);
+
+//     constructor() {
+//         _disableInitializers();
+//     }
+
+//     function initialize() initializer public {
+//         __Ownable_init(msg.sender);
+//         __UUPSUpgradeable_init();
+
+//         durationToAPR[30] = 10;
+//         durationToAPR[60] = 20;
+//         durationToAPR[90] = 30;
+//     }
+
+//     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+
+//     function getAllStakes(address _user) external view returns (Stake[] memory) {
+//         return stakes[_user];
+//     }
+
+//     function getStake(address _user, uint256 _index)
+//         external
+//         view
+//         returns (Stake memory)
+//     {
+//         return stakes[_user][_index];
+//     }
+
+//     function deposit() public payable onlyOwner {
+//         balance += msg.value;
+//     }
+
+//     function depositReward(uint256 _amount) public onlyOwner {
+//         IERC20(address(this)).transferFrom(msg.sender, address(this), _amount);
+//         rewardBalance += _amount;
+//     }
+
+//     function stake(uint8 _duration) external payable {
+//         require(
+//             _duration == 30 || _duration == 60 || _duration == 90,
+//             "Invalid duration"
+//         );
+
+//         balance += msg.value;
+//         stakes[msg.sender].push(
+//             Stake(msg.value, _duration, block.timestamp, 0, false)
+//         );
+
+//         emit NewStake(msg.sender, msg.value, _duration, block.timestamp, stakes[msg.sender].length - 1);
+//     }
+
+//     function unstake(uint256 _index) external {
+//         require(_index < stakes[msg.sender].length, "Invalid stake index");
+//         require(!stakes[msg.sender][_index].isUnstaked, "Already unstaked");
+//         require(
+//             block.timestamp >=
+//                 stakes[msg.sender][_index].startTime +
+//                     stakes[msg.sender][_index].duration,
+//             "Stake not completed yet"
+//         );
+
+//         uint256 total = calculateUnstakeTotal(_index);
+
+//         require(balance >= total, "Insufficient balance, contact admin to unstake");
+
+//         payable(msg.sender).transfer(total);
+
+//         stakes[msg.sender][_index].isUnstaked = true;
+//         emit Unstake(msg.sender, total, block.timestamp);
+//     }
+
+//     function claimReward(uint256 _index) external {
+//         require(_index < stakes[msg.sender].length, "Invalid stake index");
+//         uint256 claimTime = block.timestamp;
+//         (uint256 remainTime,uint256 reward) = calculateRemainReward(stakes[msg.sender][_index], claimTime);
+
+//         // _mint(msg.sender, reward);
+
+//         stakes[msg.sender][_index].rewardClaimedBySecond += remainTime;
+//         emit ClaimReward(msg.sender, reward, claimTime);
+//     }
+
+//     function calculateUnstakeTotal(uint256 _index) private view returns (uint256) {
+//         return stakes[msg.sender][_index].amount * (durationToAPR[stakes[msg.sender][_index].duration] / 100);
+//     }
+
+//     function calculateRemainReward(
+//         Stake memory _stake, uint256 _claimTime
+//     ) private pure returns (uint256, uint256) {
+//         uint256 remainTime = (_stake.duration > _claimTime - _stake.startTime ? _claimTime - _stake.startTime : _stake.duration );
+//         uint256 reward = ( remainTime - _stake.rewardClaimedBySecond) * _stake.amount;
+//         return (remainTime, reward);
+//     }
+// }
