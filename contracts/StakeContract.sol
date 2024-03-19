@@ -167,8 +167,7 @@ contract StakeContract is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             "Insufficient balance, contact admin to unstake"
         );
 
-        (bool sent, bytes memory data) = msg.sender.call{value: total}("");
-        require(sent, "Failed to send Ether");
+        payable(msg.sender).transfer(total);
         stakes[msg.sender][_index].isUnstaked = true;
         balance -= total;
         emit Unstake(msg.sender, total, block.timestamp);
@@ -182,7 +181,7 @@ contract StakeContract is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             claimTime
         );
 
-        // _mint(msg.sender, reward);
+        _mint(msg.sender, reward);
 
         stakes[msg.sender][_index].rewardClaimedBySecond += remainTime;
         emit ClaimReward(msg.sender, reward, claimTime);

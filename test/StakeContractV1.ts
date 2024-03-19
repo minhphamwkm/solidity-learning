@@ -4,7 +4,7 @@ import {
   time,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 
 describe("StakeV1", function () {
   async function deploy() {
@@ -82,7 +82,7 @@ describe("StakeV1", function () {
   it.only("Should alice un stake successful", async function () {
     const { sc, rc, owner, alice, bob, charlie } = await loadFixture(deploy);
 
-    await sc.connect(owner).deposit({ value: 1000 });
+    await sc.connect(owner).deposit({ value: 100 });
     await sc.connect(alice).stake(30, { value: 100 });
 
     await time.increase(400 * 24 * 60 * 60);

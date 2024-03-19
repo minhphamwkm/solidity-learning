@@ -1,4 +1,5 @@
 {
   "solidity.compileUsingRemoteVersion": "v0.8.24+commit.e11b9ed9",
-  "cSpell.words": ["nomicfoundation", "unstake"]
+  "solidity.remappingsUnix": ["@openzeppelin/=node_modules/@openzeppelin/"],
+  "cSpell.words": ["nomicfoundation", "unstake", "uups"]
 }
