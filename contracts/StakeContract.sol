@@ -41,11 +41,14 @@ V2:
     - neu claim time < duration: claim = claim time
 */
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract StakeContract is Ownable, ERC20 {
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+abstract contract StakeContract is Initializable, UUPSUpgradeable, ERC20Upgradeable, OwnableUpgradeable {
     uint256 balance;
 
     struct Stake {
@@ -60,7 +63,19 @@ contract StakeContract is Ownable, ERC20 {
 
     mapping(uint8 => uint256) public durationToAPR;
 
-    constructor() Ownable(msg.sender) ERC20("Stake", "STK") {
+    event NewStake(address user, uint256 amount, uint8 duration, uint256 startTime, uint256 stakeIndex);
+    event Unstake(address user, uint256 total, uint256 unstakeTime);
+    event ClaimReward(address user, uint256 reward, uint256 claimTime);
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() initializer public {
+        __ERC20_init("StakeToken", "STK");
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+
         durationToAPR[30] = 10;
         durationToAPR[60] = 20;
         durationToAPR[90] = 30;
@@ -92,6 +107,8 @@ contract StakeContract is Ownable, ERC20 {
         stakes[msg.sender].push(
             Stake(msg.value, _duration, block.timestamp, 0, false)
         );
+
+        emit NewStake(msg.sender, msg.value, _duration, block.timestamp, stakes[msg.sender].length - 1);
     }
 
     function unstake(uint256 _index) external {
@@ -111,6 +128,7 @@ contract StakeContract is Ownable, ERC20 {
         payable(msg.sender).transfer(total);
 
         stakes[msg.sender][_index].isUnstaked = true;
+        emit Unstake(msg.sender, total, block.timestamp);
     }
 
     function claimReward(uint256 _index) external {
@@ -121,6 +139,7 @@ contract StakeContract is Ownable, ERC20 {
         _mint(msg.sender, reward);
 
         stakes[msg.sender][_index].rewardClaimedBySecond += remainTime;
+        emit ClaimReward(msg.sender, reward, claimTime);
     }
 
     function calculateUnstakeTotal(uint256 _index) private view returns (uint256) {
@@ -134,4 +153,7 @@ contract StakeContract is Ownable, ERC20 {
         uint256 reward = ( remainTime - _stake.rewardClaimedBySecond) * _stake.amount;
         return (remainTime, reward);
     }
+}
+
+contract StakeContractV2 {
 }
