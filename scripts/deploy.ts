@@ -1,4 +1,6 @@
-import { ethers } from "hardhat";
+import "@openzeppelin/hardhat-upgrades";
+
+import { ethers, upgrades } from "hardhat";
 
 async function main() {
   const [owner, ...addresses] = await ethers.getSigners();
@@ -20,6 +22,7 @@ async function main() {
 
   // ----- ex 4 ------
   const Staking = await ethers.getContractFactory("StakeContract");
+  const stakeContract = Staking.deploy();
 }
 
 // We recommend this pattern to be able to use async/await everywhere
