@@ -40,60 +40,61 @@ V2:
 
     - neu claim time < duration: claim = claim time
 */
-
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
 import "hardhat/console.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract RewardToken is ERC20 {
-    constructor() ERC20("RewardToken", "RWT") {}
-
-    function mint(address _to, uint256 _amount) external {
-        _mint(_to, _amount);
-    }
-}
-
-interface IRewardToken {
-    function mint(address _to, uint256 _amount) external;
-}
+import "./interfaces/IRewardToken.sol";
 
 contract StakeContract is Initializable, UUPSUpgradeable, OwnableUpgradeable {
-    uint256 balance;
+    address public rewardToken;
 
+    enum PACKAGES {
+        D30,
+        D60,
+        D90
+    }
+
+    struct PackageData {
+        uint256 duration;
+        uint256 apr;
+    }
     struct Stake {
         uint256 amount;
-        uint256 duration;
-        uint8 apr;
-        uint256 startTime;
-        uint256 endTime;
-        uint256 rewardClaimedBySecond;
+        PackageData package;
+        uint256 startAt;
+        uint256 endAt;
+        uint256 lastClaimedAt;
         bool isUnstaked;
     }
 
+    mapping(PACKAGES => PackageData) public packages;
     mapping(address => Stake[]) public stakes;
 
     event NewStake(
         address user,
         uint256 amount,
-        uint256 duration,
-        uint8 apr,
-        uint256 startTime,
-        uint256 endTime,
+        PackageData package,
+        uint256 startAt,
+        uint256 endAt,
         uint256 stakeIndex
     );
-    event Unstake(address user, uint256 total, uint256 unstakeTime);
-    event ClaimReward(address user, uint256 reward, uint256 claimTime);
 
-    constructor() {
-        _disableInitializers();
+    modifier validStake(uint256 _stakeIndex) {
+        require(_stakeIndex < stakes[msg.sender].length, "Invalid stake index");
+        _;
     }
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+
+        packages[PACKAGES.D30] = PackageData(30, 10);
+        packages[PACKAGES.D60] = PackageData(60, 20);
+        packages[PACKAGES.D90] = PackageData(90, 30);
     }
 
     function _authorizeUpgrade(
@@ -108,218 +109,97 @@ contract StakeContract is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return stakes[msg.sender][_index];
     }
 
-    function deposit() public payable onlyOwner {
-        balance += msg.value;
+    function getAllPackages() public view returns (PackageData[] memory) {
+        PackageData[] memory result = new PackageData[](3);
+        result[0] = packages[PACKAGES.D30];
+        result[1] = packages[PACKAGES.D60];
+        result[2] = packages[PACKAGES.D90];
+        return result;
     }
 
-    function _mint(address _account, uint256 _value) internal onlyOwner {
-        require(_account != address(0), "Mint to the zero address");
-        IRewardToken(owner()).mint(_account, _value);
+    function setRewardToken(address _rewardToken) public onlyOwner {
+        rewardToken = _rewardToken;
     }
 
-    function stake(uint8 _duration) public payable {
-        require(
-            _duration == 30 || _duration == 60 || _duration == 90,
-            "Invalid duration"
-        );
+    function stake(PACKAGES _package) public payable {
         require(msg.value > 0, "Invalid amount");
 
-        balance += msg.value;
-
-        uint8 apr;
-        if (_duration == 30) {
-            apr = 10;
-        } else if (_duration == 60) {
-            apr = 20;
-        } else {
-            apr = 30;
-        }
-
-        uint256 endTime = block.timestamp + uint256(_duration) * 24 * 60 * 60;
+        uint256 endAt = block.timestamp + packages[_package].duration * 1 days;
 
         stakes[msg.sender].push(
-            Stake(msg.value, _duration, apr, block.timestamp, endTime, 0, false)
+            Stake(
+                msg.value,
+                packages[_package],
+                block.timestamp,
+                endAt,
+                block.timestamp,
+                false
+            )
         );
 
         emit NewStake(
             msg.sender,
             msg.value,
-            _duration,
-            apr,
+            packages[_package],
             block.timestamp,
-            endTime,
+            endAt,
             stakes[msg.sender].length - 1
         );
     }
 
-    function unstake(uint256 _index) public payable {
-        require(_index < stakes[msg.sender].length, "Invalid stake index");
+    function unstake(uint256 _index) public payable validStake(_index) {
         require(!stakes[msg.sender][_index].isUnstaked, "Already unstaked");
         require(
-            block.timestamp >= stakes[msg.sender][_index].endTime,
+            block.timestamp >= stakes[msg.sender][_index].endAt,
             "Stake not completed yet"
         );
 
-        uint256 total = calculateUnstakeTotal(_index);
+        uint256 total = _calculateUnstakeTotal(_index);
 
         require(
-            balance >= total,
+            address(this).balance >= total,
             "Insufficient balance, contact admin to unstake"
         );
 
         payable(msg.sender).transfer(total);
         stakes[msg.sender][_index].isUnstaked = true;
-        balance -= total;
-        emit Unstake(msg.sender, total, block.timestamp);
     }
 
-    function claimReward(uint256 _index) public {
-        require(_index < stakes[msg.sender].length, "Invalid stake index");
-        uint256 claimTime = block.timestamp;
-        (uint256 remainTime, uint256 reward) = calculateRemainReward(
+    function claimReward(uint256 _index) public validStake(_index) {
+        uint256 reward = _calculateRemainReward(
             stakes[msg.sender][_index],
-            claimTime
+            block.timestamp
         );
 
         _mint(msg.sender, reward);
 
-        stakes[msg.sender][_index].rewardClaimedBySecond += remainTime;
-        emit ClaimReward(msg.sender, reward, claimTime);
+        stakes[msg.sender][_index].lastClaimedAt = block.timestamp;
     }
 
-    function calculateUnstakeTotal(
+    function _calculateUnstakeTotal(
         uint256 _index
     ) private view returns (uint256) {
         return
             (stakes[msg.sender][_index].amount *
-                (uint256(stakes[msg.sender][_index].apr) + 100)) / 100;
+                (stakes[msg.sender][_index].package.apr + 100)) / 100;
     }
 
-    function calculateRemainReward(
+    function _calculateRemainReward(
         Stake memory _stake,
         uint256 _claimTime
-    ) private pure returns (uint256, uint256) {
-        uint256 remainTime = (
-            _stake.duration > _claimTime - _stake.startTime
-                ? _claimTime - _stake.startTime
-                : _stake.duration
-        );
-        uint256 reward = (remainTime - _stake.rewardClaimedBySecond) *
-            _stake.amount;
-        return (remainTime, reward);
+    ) private pure returns (uint256 reward) {
+        uint256 remainTime = Math.min(_stake.endAt, _claimTime) -
+            _stake.lastClaimedAt;
+        reward = (remainTime * _stake.amount) / 100_000;
     }
+
+    function _mint(address _account, uint256 _value) private {
+        require(_value > 0, "Mint value must be greater than 0");
+        IRewardToken(rewardToken).mint(_account, _value);
+    }
+
+    receive() external payable {}
+    fallback() external payable {}
 }
 
-// contract StakeContractV2 is Initializable, UUPSUpgradeable, OwnableUpgradeable{
-//     uint256 balance;
-
-//     struct Stake {
-//         uint256 amount;
-//         uint8 duration;
-//         uint256 startTime;
-//         uint256 rewardClaimedBySecond;
-//         bool isUnstaked;
-//     }
-
-//     uint256 public rewardBalance;
-
-//     mapping(address => Stake[]) public stakes;
-//     mapping(uint8 => uint256) public durationToAPR;
-
-//     event NewStake(address user, uint256 amount, uint8 duration, uint256 startTime, uint256 stakeIndex);
-//     event Unstake(address user, uint256 total, uint256 unstakeTime);
-//     event ClaimReward(address user, uint256 reward, uint256 claimTime);
-
-//     constructor() {
-//         _disableInitializers();
-//     }
-
-//     function initialize() initializer public {
-//         __Ownable_init(msg.sender);
-//         __UUPSUpgradeable_init();
-
-//         durationToAPR[30] = 10;
-//         durationToAPR[60] = 20;
-//         durationToAPR[90] = 30;
-//     }
-
-//     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-//     function getAllStakes(address _user) public view returns (Stake[] memory) {
-//         return stakes[_user];
-//     }
-
-//     function getStake(address _user, uint256 _index)
-//         external
-//         view
-//         returns (Stake memory)
-//     {
-//         return stakes[_user][_index];
-//     }
-
-//     function deposit() public payable onlyOwner {
-//         balance += msg.value;
-//     }
-
-//     function depositReward(uint256 _amount) public onlyOwner {
-//         IERC20(address(this)).transferFrom(msg.sender, address(this), _amount);
-//         rewardBalance += _amount;
-//     }
-
-//     function stake(uint8 _duration) external payable {
-//         require(
-//             _duration == 30 || _duration == 60 || _duration == 90,
-//             "Invalid duration"
-//         );
-
-//         balance += msg.value;
-//         stakes[msg.sender].push(
-//             Stake(msg.value, _duration, block.timestamp, 0, false)
-//         );
-
-//         emit NewStake(msg.sender, msg.value, _duration, block.timestamp, stakes[msg.sender].length - 1);
-//     }
-
-//     function unstake(uint256 _index) external {
-//         require(_index < stakes[msg.sender].length, "Invalid stake index");
-//         require(!stakes[msg.sender][_index].isUnstaked, "Already unstaked");
-//         require(
-//             block.timestamp >=
-//                 stakes[msg.sender][_index].startTime +
-//                     stakes[msg.sender][_index].duration,
-//             "Stake not completed yet"
-//         );
-
-//         uint256 total = calculateUnstakeTotal(_index);
-
-//         require(balance >= total, "Insufficient balance, contact admin to unstake");
-
-//         payable(msg.sender).transfer(total);
-
-//         stakes[msg.sender][_index].isUnstaked = true;
-//         emit Unstake(msg.sender, total, block.timestamp);
-//     }
-
-//     function claimReward(uint256 _index) external {
-//         require(_index < stakes[msg.sender].length, "Invalid stake index");
-//         uint256 claimTime = block.timestamp;
-//         (uint256 remainTime,uint256 reward) = calculateRemainReward(stakes[msg.sender][_index], claimTime);
-
-//         // _mint(msg.sender, reward);
-
-//         stakes[msg.sender][_index].rewardClaimedBySecond += remainTime;
-//         emit ClaimReward(msg.sender, reward, claimTime);
-//     }
-
-//     function calculateUnstakeTotal(uint256 _index) private view returns (uint256) {
-//         return stakes[msg.sender][_index].amount * (durationToAPR[stakes[msg.sender][_index].duration] / 100);
-//     }
-
-//     function calculateRemainReward(
-//         Stake memory _stake, uint256 _claimTime
-//     ) private pure returns (uint256, uint256) {
-//         uint256 remainTime = (_stake.duration > _claimTime - _stake.startTime ? _claimTime - _stake.startTime : _stake.duration );
-//         uint256 reward = ( remainTime - _stake.rewardClaimedBySecond) * _stake.amount;
-//         return (remainTime, reward);
-//     }
-// }
+contract StakeContractV2 {}

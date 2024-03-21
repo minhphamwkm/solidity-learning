@@ -1,5 +1,7 @@
 {
   "solidity.compileUsingRemoteVersion": "v0.8.24+commit.e11b9ed9",
   "solidity.remappingsUnix": ["@openzeppelin/=node_modules/@openzeppelin/"],
-  "cSpell.words": ["nomicfoundation", "unstake", "uups"]
+  "cSpell.words": ["keccak", "nomicfoundation", "unstake", "uups"],
+  "prettier.printWidth": 120,
+  "editor.rulers": [119]
 }

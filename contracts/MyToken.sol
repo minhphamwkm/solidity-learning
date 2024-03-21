@@ -15,24 +15,19 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 // Chỉ owner mới được burn token của 1 address bất kì với số lượng bất kì
 
 contract MyToken is ERC20, Ownable {
-    constructor(address owner) Ownable(owner) ERC20("MyToken", "MTK") {
-        _mint(owner, 1000000 * (10 ** uint256(decimals())));
+    constructor(address _owner) Ownable(_owner) ERC20("MyToken", "MTK") {
+        _mint(_owner, 1000000 * (10 ** uint256(decimals())));
     }
 
-    function burn(address wallet, uint256 amount) public onlyOwner() {
-        require(amount > 0, "Amount must be greater than zero");
-        require(balanceOf(wallet) >= amount, "ERC20: burn amount exceeds balance");
-        _burn(wallet, amount);
+    function burn(address _wallet, uint256 _amount) public onlyOwner {
+        _burn(_wallet, _amount);
     }
 
-    function selfBurn(uint256 amount) public {
-        require(amount > 0, "Amount must be greater than zero");
-        require(balanceOf(msg.sender) >= amount, "ERC20: burn amount exceeds balance");
-        _burn(msg.sender, amount);
+    function selfBurn(uint256 _amount) public {
+        _burn(msg.sender, _amount);
     }
 
-    function mint(address wallet, uint256 amount) public onlyOwner() {
-        require(amount > 0, "Amount must be greater than zero");
-        _mint(wallet, amount);
+    function mint(address _wallet, uint256 _amount) public onlyOwner {
+        _mint(_wallet, _amount);
     }
 }

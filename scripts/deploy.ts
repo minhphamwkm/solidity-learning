@@ -5,24 +5,33 @@ import { ethers, upgrades } from "hardhat";
 async function main() {
   const [owner, ...addresses] = await ethers.getSigners();
 
-  // ----- ex 1 ------
-  const MyToken = await ethers.getContractFactory("MyToken");
-  await MyToken.deploy(owner);
+  // // ----- ex 1 ------
+  // const MyToken = await ethers.getContractFactory("MyToken");
+  // await MyToken.deploy(owner);
 
-  // ----- ex 2 ------
-  const NftToken = await ethers.getContractFactory("NftToken");
-  await NftToken.deploy(owner);
+  // // ----- ex 2 ------
+  // const NftToken = await ethers.getContractFactory("NftToken");
+  // await NftToken.deploy(owner);
 
-  // ----- ex 3 ------
-  const Nft = await ethers.getContractFactory("NFT");
-  await Nft.deploy(owner);
+  // // ----- ex 3 ------
+  // const Nft = await ethers.getContractFactory("NFT");
+  // await Nft.deploy(owner);
 
-  const Auction = await ethers.getContractFactory("Auction");
-  await Auction.deploy(owner);
+  // const Auction = await ethers.getContractFactory("Auction");
+  // await Auction.deploy(owner);
 
   // ----- ex 4 ------
+  const RewardToken = await ethers.getContractFactory("RewardToken");
+  const rewardToken = await RewardToken.deploy();
+
   const Staking = await ethers.getContractFactory("StakeContract");
-  const stakeContract = Staking.deploy();
+  const stakeContract = await upgrades.deployProxy(Staking, {
+    initializer: "initialize",
+    kind: "uups",
+    initialOwner: owner.address,
+  });
+  await stakeContract.deployed();
+  // cach gui eth vao contract
 }
 
 // We recommend this pattern to be able to use async/await everywhere

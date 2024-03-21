@@ -17,7 +17,6 @@ describe("MyToken", function () {
 
     expect(await myToken.name()).to.equal("MyToken");
     expect(await myToken.symbol()).to.equal("MTK");
-
     const parsedMint = ethers.parseUnits("1000000", 18);
     expect(await myToken.balanceOf(owner.address)).to.equal(parsedMint);
   });
@@ -28,6 +27,16 @@ describe("MyToken", function () {
     const parsedMint = ethers.parseUnits("1000000", 18);
     await myToken.mint(alice, parsedMint);
     expect(await myToken.balanceOf(alice)).to.equal(parsedMint);
+  });
+
+  it("Should alice self mint 1M failed", async function () {
+    const { myToken, owner, alice, bob } = await loadFixture(deploy);
+
+    const parsedMint = ethers.parseUnits("1000000", 18);
+    await expect(myToken.connect(alice).mint(alice, parsedMint)).to.be.revertedWithCustomError(
+      myToken,
+      "OwnableUnauthorizedAccount"
+    );
   });
 
   it("Should transfer from alice to bob 100", async function () {
@@ -54,9 +63,7 @@ describe("MyToken", function () {
     let parsedApproveAmount = ethers.parseUnits("50", 18);
     await myToken.connect(alice).approve(bob, parsedApproveAmount);
 
-    let allowanceAmount = ethers.formatEther(
-      await myToken.allowance(alice, bob)
-    );
+    let allowanceAmount = ethers.formatEther(await myToken.allowance(alice, bob));
     expect(allowanceAmount).to.equal("50.0");
   });
 
@@ -92,6 +99,34 @@ describe("MyToken", function () {
     expect(bobBalance).to.equal("50.0");
   });
 
+  it("Should admin burn alice 10", async function () {
+    const { myToken, owner, alice, bob } = await loadFixture(deploy);
+
+    const parsedMint = ethers.parseUnits("1000000", 18);
+    await myToken.mint(alice, parsedMint);
+    await myToken.burn(alice, ethers.parseUnits("10", 18));
+    const aliceBalance = ethers.formatEther(await myToken.balanceOf(alice));
+    expect(aliceBalance).to.equal("999990.0");
+  });
+
+  it("Should admin burn alice 10 fail cause Insufficient Balance", async function () {
+    const { myToken, owner, alice, bob } = await loadFixture(deploy);
+
+    await myToken.mint(alice, 1);
+    await expect(myToken.burn(alice, 10)).to.be.revertedWithCustomError(myToken, "ERC20InsufficientBalance");
+  });
+
+  it("Should alice use admin burn 10 fail", async function () {
+    const { myToken, owner, alice, bob } = await loadFixture(deploy);
+
+    const parsedMint = ethers.parseUnits("1000000", 18);
+    await myToken.mint(alice, parsedMint);
+    await expect(myToken.connect(alice).burn(alice, ethers.parseUnits("10", 18))).to.be.revertedWithCustomError(
+      myToken,
+      "OwnableUnauthorizedAccount"
+    );
+  });
+
   it("Should alice burn 10 itself", async function () {
     const { myToken, owner, alice, bob } = await loadFixture(deploy);
 
@@ -103,5 +138,15 @@ describe("MyToken", function () {
 
     const aliceBalance = ethers.formatEther(await myToken.balanceOf(alice));
     expect(aliceBalance).to.equal("999990.0");
+  });
+
+  it("Should alice burn self 10 fail cause Insufficient Balance", async function () {
+    const { myToken, owner, alice, bob } = await loadFixture(deploy);
+
+    await myToken.mint(alice, 1);
+    await expect(myToken.connect(alice).selfBurn(10)).to.be.revertedWithCustomError(
+      myToken,
+      "ERC20InsufficientBalance"
+    );
   });
 });
