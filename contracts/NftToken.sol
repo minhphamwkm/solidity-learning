@@ -48,10 +48,7 @@ contract NftToken is ERC721, Ownable {
     }
 
     modifier claimable() {
-        require(
-            blockStart > block.number || blockStart + TIMELINE < block.number,
-            "Auction not closed"
-        );
+        require(blockStart + TIMELINE < block.number, "Auction not closed");
         _;
     }
 

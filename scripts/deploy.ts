@@ -22,7 +22,7 @@ async function main() {
 
   // ----- ex 4 ------
   const RewardToken = await ethers.getContractFactory("RewardToken");
-  const rewardToken = await RewardToken.deploy();
+  await RewardToken.deploy();
 
   const Staking = await ethers.getContractFactory("StakeContract");
   const stakeContract = await upgrades.deployProxy(Staking, {
@@ -31,7 +31,6 @@ async function main() {
     initialOwner: owner.address,
   });
   await stakeContract.deployed();
-  // cach gui eth vao contract
 }
 
 // We recommend this pattern to be able to use async/await everywhere

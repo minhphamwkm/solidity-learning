@@ -2,9 +2,10 @@
 
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "./interfaces/INFT.sol";
 
 /**
  * Bài 3:
@@ -22,25 +23,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
     - Vẽ diagram cho flow của contract
     - Viết contract theo logic được vẽ từ diagram + unit test
  */
-
-contract NFT is ERC721, Ownable {
-    constructor(address owner) Ownable(owner) ERC721("NFT", "NFT") {}
-
-    function mint(address to, uint256 tokenId) external onlyOwner {
-        _mint(to, tokenId);
-    }
-}
-
-interface INFT {
-    function ownerOf(uint256 tokenId) external view returns (address);
-
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external;
-}
-
 contract Auction is Ownable, IERC721Receiver {
     struct AuctionInfo {
         address owner;
@@ -246,7 +228,7 @@ contract Auction is Ownable, IERC721Receiver {
 
         require(auction.isClaimed == false, "Auction already claimed");
 
-        NFT nft = NFT(auction.tokenContract);
+        INFT nft = INFT(auction.tokenContract);
 
         nft.safeTransferFrom(address(this), auction.owner, auction.tokenId);
 

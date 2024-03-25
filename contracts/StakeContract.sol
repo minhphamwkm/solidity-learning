@@ -194,12 +194,9 @@ contract StakeContract is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function _mint(address _account, uint256 _value) private {
-        require(_value > 0, "Mint value must be greater than 0");
         IRewardToken(rewardToken).mint(_account, _value);
     }
 
     receive() external payable {}
     fallback() external payable {}
 }
-
-contract StakeContractV2 {}
